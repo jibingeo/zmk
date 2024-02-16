@@ -7,7 +7,6 @@
 #define DT_DRV_COMPAT azoteq_iqs5xx
 
 #include <zephyr/drivers/gpio.h>
-#include <nrfx_gpiote.h>
 #include <zephyr/init.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
