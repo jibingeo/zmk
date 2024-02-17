@@ -16,6 +16,15 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/devicetree.h>
 #include <stdlib.h>
+#if CONFIG_MINIMAL_LIBC
+static float fabsf(float x) {
+	union {float f; uint32_t i;} u = {x};
+	u.i &= 0x7fffffff;
+	return u.f;
+}
+#else
+#include <math.h>
+#endif
 
 LOG_MODULE_DECLARE(azoteq_iqs5xx, CONFIG_ZMK_LOG_LEVEL);
 
@@ -202,11 +211,11 @@ static void trackpad_trigger_handler(const struct device *dev, const struct iqs5
                 // Report scroll only if a certain distance has been travelled
                 int8_t scroll = 0;
                 int8_t pan = 0;
-                if(abs(lastXScrollReport) - (int16_t)SCROLL_REPORT_DISTANCE > 0) {
+                if(fabsf(lastXScrollReport) - (int16_t)SCROLL_REPORT_DISTANCE > 0) {
                     scroll = lastXScrollReport >= 0 ? 1 : -1;
                     lastXScrollReport = 0;
                 }
-                if(abs(lastYScrollReport) - (int16_t)SCROLL_REPORT_DISTANCE > 0) {
+                if(fabsf(lastYScrollReport) - (int16_t)SCROLL_REPORT_DISTANCE > 0) {
                     pan = lastYScrollReport >= 0 ? 1 : -1;
                     lastYScrollReport = 0;
                 }
