@@ -17,6 +17,7 @@
 #include <zephyr/devicetree.h>
 #include <stdlib.h>
 #if CONFIG_MINIMAL_LIBC
+//https://git.musl-libc.org/cgit/musl/tree/src/math/fabsf.c
 static float fabsf(float x) {
 	union {float f; uint32_t i;} u = {x};
 	u.i &= 0x7fffffff;
