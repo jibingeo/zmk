@@ -4,9 +4,9 @@
  * @brief File to handle iqs5xx data
  * @version 0.1
  * @date 2022-06-18
- * 
+ *
  * @copyright Copyright (c) 2022
- * 
+ *
  */
 #include <zephyr/device.h>
 #include <zephyr/init.h>
@@ -17,11 +17,14 @@
 #include <zephyr/devicetree.h>
 #include <stdlib.h>
 #if CONFIG_MINIMAL_LIBC
-//https://git.musl-libc.org/cgit/musl/tree/src/math/fabsf.c
+// https://git.musl-libc.org/cgit/musl/tree/src/math/fabsf.c
 static float fabsf(float x) {
-	union {float f; uint32_t i;} u = {x};
-	u.i &= 0x7fffffff;
-	return u.f;
+    union {
+        float f;
+        uint32_t i;
+    } u = {x};
+    u.i &= 0x7fffffff;
+    return u.f;
 }
 #else
 #include <math.h>
@@ -30,20 +33,20 @@ static float fabsf(float x) {
 LOG_MODULE_DECLARE(azoteq_iqs5xx, CONFIG_ZMK_LOG_LEVEL);
 
 // Time in ms to release left click after the gesture
-#define TRACKPAD_LEFTCLICK_RELEASE_TIME     50
+#define TRACKPAD_LEFTCLICK_RELEASE_TIME 50
 // Time in ms to release right click after the gesture
-#define TRACKPAD_RIGHTCLICK_RELEASE_TIME    50
+#define TRACKPAD_RIGHTCLICK_RELEASE_TIME 50
 // Time in ms to release right click after the gesture
-#define TRACKPAD_MIDDLECLICK_RELEASE_TIME    50
+#define TRACKPAD_MIDDLECLICK_RELEASE_TIME 50
 // Minimum distance to travel until a report is sent
-#define SCROLL_REPORT_DISTANCE              35
+#define SCROLL_REPORT_DISTANCE 35
 
 // Time in ms when three fingers are considered to be tapped
-#define TRACKPAD_THREE_FINGER_CLICK_TIME    300
+#define TRACKPAD_THREE_FINGER_CLICK_TIME 300
 
 static bool isHolding = false;
 
-//LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+// LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 static const struct device *trackpad;
 
@@ -59,7 +62,7 @@ static int16_t lastYScrollReport = 0;
 
 static bool threeFingersPressed = false;
 
-#define MOUSE_MAX_SENSITIVITY     2
+#define MOUSE_MAX_SENSITIVITY 2
 
 static uint8_t mouseSensitivity = 100;
 
@@ -72,8 +75,8 @@ struct {
 
 /**
  * @brief Called when `trackpad_registers` is updated via zmk_control/zmk_config
- * 
- * @param field 
+ *
+ * @param field
  */
 /*
 void trackpad_config_on_update (struct zmk_config_field *field) {
@@ -86,7 +89,7 @@ void trackpad_config_on_update (struct zmk_config_field *field) {
 */
 
 struct k_timer leftclick_release_timer;
-static void trackpad_leftclick_release () {
+static void trackpad_leftclick_release() {
     zmk_hid_mouse_button_release(0);
     zmk_endpoints_send_mouse_report();
     inputEventActive = false;
@@ -94,7 +97,7 @@ static void trackpad_leftclick_release () {
 K_TIMER_DEFINE(leftclick_release_timer, trackpad_leftclick_release, NULL);
 
 struct k_timer rightclick_release_timer;
-static void trackpad_rightclick_release () {
+static void trackpad_rightclick_release() {
     zmk_hid_mouse_button_release(1);
     zmk_endpoints_send_mouse_report();
     inputEventActive = false;
@@ -102,21 +105,20 @@ static void trackpad_rightclick_release () {
 K_TIMER_DEFINE(rightclick_release_timer, trackpad_rightclick_release, NULL);
 
 struct k_timer middleclick_release_timer;
-static void trackpad_middleclick_release () {
+static void trackpad_middleclick_release() {
     zmk_hid_mouse_button_release(2);
     zmk_endpoints_send_mouse_report();
     inputEventActive = false;
 }
 K_TIMER_DEFINE(middleclick_release_timer, trackpad_middleclick_release, NULL);
 
-
-static inline void trackpad_leftclick () {
-    if(isHolding)  {
+static inline void trackpad_leftclick() {
+    if (isHolding) {
         zmk_hid_mouse_button_release(0);
         isHolding = false;
         inputEventActive = false;
     } else {
-        if(inputEventActive)
+        if (inputEventActive)
             return;
 
         zmk_hid_mouse_button_press(0);
@@ -125,23 +127,22 @@ static inline void trackpad_leftclick () {
     }
 }
 
-static inline void trackpad_rightclick () {
-    if(inputEventActive)
+static inline void trackpad_rightclick() {
+    if (inputEventActive)
         return;
     zmk_hid_mouse_button_press(1);
     k_timer_start(&rightclick_release_timer, K_MSEC(TRACKPAD_RIGHTCLICK_RELEASE_TIME), K_NO_WAIT);
     inputEventActive = true;
 }
 
-static inline void trackpad_middleclick () {
+static inline void trackpad_middleclick() {
     LOG_ERR("SEND MIDDLECLICK");
-    if(inputEventActive)
+    if (inputEventActive)
         return;
     zmk_hid_mouse_button_press(2);
     k_timer_start(&middleclick_release_timer, K_MSEC(TRACKPAD_MIDDLECLICK_RELEASE_TIME), K_NO_WAIT);
     inputEventActive = true;
 }
-
 
 static inline void trackpad_tap_and_hold(bool g) {
     if (!isHolding && g) {
@@ -150,9 +151,6 @@ static inline void trackpad_tap_and_hold(bool g) {
         isHolding = true;
     }
 }
-
-
-
 
 int64_t time = 0;
 
@@ -165,104 +163,105 @@ uint16_t STRENGTH = 400;
 static void trackpad_trigger_handler(const struct device *dev, const struct iqs5xx_rawdata *data) {
 
     bool multiTouch = false;
-    
-    if(data->finger_count > 1) {
+
+    if (data->finger_count > 1) {
         multiTouch = true;
     }
 
     bool hasGesture = false;
 
-    if(data->finger_count == 3 && !threeFingersPressed) {
+    if (data->finger_count == 3 && !threeFingersPressed) {
         threeFingerPressTime = k_uptime_get();
         threeFingersPressed = true;
     }
-    
-    if(data->finger_count == 0) {
+
+    if (data->finger_count == 0) {
         accumPos.x = 0;
         accumPos.y = 0;
-        if(threeFingersPressed && k_uptime_get() - threeFingerPressTime < TRACKPAD_THREE_FINGER_CLICK_TIME) {
+        if (threeFingersPressed &&
+            k_uptime_get() - threeFingerPressTime < TRACKPAD_THREE_FINGER_CLICK_TIME) {
             hasGesture = true;
-            //middleclick
+            // middleclick
             trackpad_middleclick();
-            zmk_hid_mouse_movement_set(0,0);
+            zmk_hid_mouse_movement_set(0, 0);
         }
         threeFingersPressed = false;
     }
 
-    if(data->finger_count != 2) {
+    if (data->finger_count != 2) {
         // Reset scroll
         zmk_hid_mouse_scroll_set(0, 0);
     }
 
     // Check if any gesture exists
-    if((data->gestures0 || data->gestures1) && !hasGesture) {
-        switch(data->gestures1) {
-            case GESTURE_TWO_FINGER_TAP:
-                hasGesture = true;
-                // Right click
-                trackpad_rightclick();
-                zmk_hid_mouse_movement_set(0,0);
-                break;                   
-            case GESTURE_SCROLLG:
-                hasGesture = true;
-                lastXScrollReport += data->ry;
-                lastYScrollReport += data->rx;
-                // Pan can be always reported
-                //int8_t pan = -data->rx;
-                // Report scroll only if a certain distance has been travelled
-                int8_t scroll = 0;
-                int8_t pan = 0;
-                if(fabsf(lastXScrollReport) - (int16_t)SCROLL_REPORT_DISTANCE > 0) {
-                    scroll = lastXScrollReport >= 0 ? 1 : -1;
-                    lastXScrollReport = 0;
-                }
-                if(fabsf(lastYScrollReport) - (int16_t)SCROLL_REPORT_DISTANCE > 0) {
-                    pan = lastYScrollReport >= 0 ? 1 : -1;
-                    lastYScrollReport = 0;
-                }
-                zmk_hid_mouse_scroll_set(pan, scroll);
-                zmk_hid_mouse_movement_set(0,0);
-                //k_msleep(10);
-                break;
+    if ((data->gestures0 || data->gestures1) && !hasGesture) {
+        switch (data->gestures1) {
+        case GESTURE_TWO_FINGER_TAP:
+            hasGesture = true;
+            // Right click
+            trackpad_rightclick();
+            zmk_hid_mouse_movement_set(0, 0);
+            break;
+        case GESTURE_SCROLLG:
+            hasGesture = true;
+            lastXScrollReport += data->ry;
+            lastYScrollReport += data->rx;
+            // Pan can be always reported
+            // int8_t pan = -data->rx;
+            // Report scroll only if a certain distance has been travelled
+            int8_t scroll = 0;
+            int8_t pan = 0;
+            if (fabsf(lastXScrollReport) - (int16_t)SCROLL_REPORT_DISTANCE > 0) {
+                scroll = lastXScrollReport >= 0 ? 1 : -1;
+                lastXScrollReport = 0;
+            }
+            if (fabsf(lastYScrollReport) - (int16_t)SCROLL_REPORT_DISTANCE > 0) {
+                pan = lastYScrollReport >= 0 ? 1 : -1;
+                lastYScrollReport = 0;
+            }
+            zmk_hid_mouse_scroll_set(pan, scroll);
+            zmk_hid_mouse_movement_set(0, 0);
+            // k_msleep(10);
+            break;
         }
-        switch(data->gestures0) {
-            case GESTURE_SINGLE_TAP:
-                // Left click
-                hasGesture = true;
-                trackpad_leftclick();
-                zmk_hid_mouse_movement_set(0,0);
-                break;
-            case GESTURE_TAP_AND_HOLD:
-                //drag n drop
-                trackpad_tap_and_hold(true);
-                zmk_hid_mouse_movement_set(0,0);
-                isHolding = true;
+        switch (data->gestures0) {
+        case GESTURE_SINGLE_TAP:
+            // Left click
+            hasGesture = true;
+            trackpad_leftclick();
+            zmk_hid_mouse_movement_set(0, 0);
+            break;
+        case GESTURE_TAP_AND_HOLD:
+            // drag n drop
+            trackpad_tap_and_hold(true);
+            zmk_hid_mouse_movement_set(0, 0);
+            isHolding = true;
         }
     }
-    
-    //check for tap and hold release
+
+    // check for tap and hold release
 
     bool inputMoved = false;
 
-    if(!hasGesture) {
+    if (!hasGesture) {
         // No gesture, can send mouse delta position
-        if(data->finger_count == 1) {
-            float sensMp = (float)mouseSensitivity/128.0F;
+        if (data->finger_count == 1) {
+            float sensMp = (float)mouseSensitivity / 128.0F;
             accumPos.x += data->rx * sensMp;
             accumPos.y += data->ry * sensMp;
             int16_t xp = accumPos.x;
             int16_t yp = accumPos.y;
 
             uint8_t updatePos = 0;
-            if(abs(accumPos.x) >= 1) {
+            if (abs(accumPos.x) >= 1) {
                 updatePos = 1;
                 accumPos.x = 0;
             }
-            if(abs(accumPos.y) >= 1) {
+            if (abs(accumPos.y) >= 1) {
                 updatePos = 1;
                 accumPos.y = 0;
             }
-            if(updatePos) {
+            if (updatePos) {
                 zmk_hid_mouse_movement_set(xp, yp);
                 inputMoved = true;
             }
@@ -271,7 +270,7 @@ static void trackpad_trigger_handler(const struct device *dev, const struct iqs5
 
     lastFingerCount = data->finger_count;
 
-    if(inputMoved || hasGesture) {
+    if (inputMoved || hasGesture) {
         // Send mouse report
         zmk_endpoints_send_mouse_report();
     }
@@ -287,7 +286,7 @@ static int trackpad_init(const struct device *_arg) {
 
     int err = 0;
     err = iqs5xx_trigger_set(trackpad, trackpad_trigger_handler);
-    if(err) {
+    if (err) {
         LOG_ERR("Failed to set IQS5XX trigger");
         return -EINVAL;
     }
