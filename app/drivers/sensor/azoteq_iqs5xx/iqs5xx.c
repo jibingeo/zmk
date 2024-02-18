@@ -24,7 +24,7 @@ static int iqs_regdump_err = 0;
 struct iqs5xx_reg_config iqs5xx_reg_config_default() {
     struct iqs5xx_reg_config regconf;
 
-    regconf.activeRefreshRate = 10;
+    regconf.activeRefreshRate = 1;
     regconf.idleRefreshRate = 50;
     regconf.singleFingerGestureMask = GESTURE_SINGLE_TAP | GESTURE_TAP_AND_HOLD;
     regconf.multiFingerGestureMask = GESTURE_TWO_FINGER_TAP | GESTURE_SCROLLG;
@@ -58,7 +58,13 @@ static int iqs5xx_seq_read(const struct device *dev, const uint16_t start, uint8
     const struct iqs5xx_data *data = dev->data;
     const struct iqs5xx_config *config = dev->config;
     uint16_t nstart = (start << 8) | (start >> 8);
-    return i2c_write_read(data->i2c, AZOTEQ_IQS5XX_ADDR, &nstart, sizeof(nstart), read_buf, len);
+    while(1) {
+      int err = i2c_write_read(data->i2c, AZOTEQ_IQS5XX_ADDR, &nstart, sizeof(nstart), read_buf, len);
+      if(!err)
+        break;
+      LOG_ERR("read error");
+    }
+    LOG_INF("read done");
 }
 
 /**
@@ -88,8 +94,13 @@ static int iqs5xx_write(const struct device *dev, const uint16_t start_addr, uin
     msg[1].len = num_bytes;
     msg[1].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
 
-    int err = i2c_transfer(data->i2c, msg, 2, AZOTEQ_IQS5XX_ADDR);
-    return err;
+    while(1) {
+      int err = i2c_transfer(data->i2c, msg, 2, AZOTEQ_IQS5XX_ADDR);
+      if(!err)
+        break;
+      LOG_ERR("write error");
+    }
+    LOG_INF("write done");
 }
 
 static int iqs5xx_reg_dump(const struct device *dev) {
@@ -278,11 +289,9 @@ int iqs5xx_registers_init(const struct device *dev, const struct iqs5xx_reg_conf
 
     *((uint16_t *)wbuff) = SWPEND16(768);
     err |= iqs5xx_write(dev, XResolution_adr, wbuff, 2);
-    LOG_ERR("XResolution_adr: %i", err);
 
     *((uint16_t *)wbuff) = SWPEND16(512);
     err |= iqs5xx_write(dev, YResolution_adr, wbuff, 2);
-    LOG_ERR("YResolution_adr: %i", err);
 
     // Set tap time
     *((uint16_t *)wbuff) = SWPEND16(config->tapTime);
