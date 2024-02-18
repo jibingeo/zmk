@@ -14,6 +14,7 @@
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/mutex.h>
 
 // Single finger data
 struct iqs5xx_finger {
@@ -62,6 +63,7 @@ struct iqs5xx_data {
     struct iqs5xx_rawdata raw_data;
     // GPIO semaphore
     struct k_sem gpio_sem;
+    struct k_sem isr_sem;
 };
 
 struct iqs5xx_config {
